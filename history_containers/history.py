@@ -1,6 +1,5 @@
 from typing import Dict, List, Optional, Tuple, Type, Any
 
-from .dict import DictWrapper
 
 _Iterables = (Dict, List)
 
@@ -21,6 +20,7 @@ class HistoryMixin:
         self._history.clear()
 
     def get_wrapped(self, key: Any, value: Any):
+        from .dict import DictWrapper
         if isinstance(value, Dict) and Dict in self._wrapped_types:
             return DictWrapper(value, self._history, self._wrapped_types, key)
         elif isinstance(value, List) and List in self._wrapped_types:

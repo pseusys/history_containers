@@ -3,13 +3,12 @@ from typing import Optional, Dict, Type, Tuple, Any, Iterator
 
 from .history import HistoryMixin, _History
 
-str_base = str, bytes, bytearray
-items = 'items'
 
 _RaiseKeyError = object()
 
 
 class DictWrapper(dict, HistoryMixin):
+    __dict__ = None
     _dict: Dict
 
     def clear(self):  # TODO
@@ -50,9 +49,9 @@ class DictWrapper(dict, HistoryMixin):
         return super(DictWrapper, self).setdefault(k, default)
 
     def update(self, mapping=(), **kwargs):  # TODO
-        if hasattr(mapping, items):
-            mapping = getattr(mapping, items)()
-        pairs = ((k, v) for k, v in chain(mapping, getattr(kwargs, items)()))
+        if hasattr(mapping, 'items'):
+            mapping = getattr(mapping, 'items')()
+        pairs = ((k, v) for k, v in chain(mapping, getattr(kwargs, 'items')()))
         super(DictWrapper, self).update(pairs)
 
     def values(self):  # TODO
@@ -72,9 +71,6 @@ class DictWrapper(dict, HistoryMixin):
     def __eq__(self, obj: object) -> bool:
         return self._dict.__eq__(obj)
 
-    def __getattribute__(self, name: str) -> Any:
-        return self._dict.__getattribute__(name)
-
     def __getitem__(self, key: Any) -> Any:
         return super().get_wrapped(key, super().__getitem__(key))
 
@@ -85,8 +81,8 @@ class DictWrapper(dict, HistoryMixin):
         return self._dict.__gt__(obj)
 
     def __init__(self, dictionary: Optional[Dict] = None, history: Optional[_History] = None, wrapped_types: Optional[Tuple[Type]] = None, prefix: Any = None):
+        HistoryMixin.__init__(self, history, wrapped_types, prefix)
         self._dict = dictionary
-        super(HistoryMixin, DictWrapper).__init__(history, wrapped_types, prefix)
 
     def __ior__(self, obj: Dict) -> Dict:  # TODO
         return self._dict.__ior__(obj)
@@ -124,3 +120,10 @@ class DictWrapper(dict, HistoryMixin):
         item = super().__setitem__(key, value)
         super().set_wrapped(key, item)
         return item
+
+    #@classmethod
+    #def __new__(cls, *args: Any, **kwargs: Any):
+    #    return cls()
+
+    def __str__(self) -> str:
+        return self._dict.__str__()
