@@ -1,5 +1,10 @@
 from itertools import chain
+from sys import version_info
 from typing import Optional, Dict, Type, Tuple, Any, Iterator
+if version_info.minor >= 11:
+    from typing import Self
+else:
+    Self = 'DictWrapper'
 
 from .history import HistoryMixin
 
@@ -8,15 +13,17 @@ _RaiseKeyError = object()
 
 
 class DictWrapper(dict, HistoryMixin):
-    __dict__ = None  # TODO
+    __dict__ = None
     _dict: Dict
 
-    def clear(self):  # TODO
-        """ D.clear() -> None.  Remove all items from D. """
-        pass
+    def clear(self):
+        self._dict.clear()
+        self.clear_history()
 
-    def copy(self):  # TODO
-        return type(self)(self)
+    def copy(self) -> Self:
+        copy = type(self)(self._dict, self._parent, self._wrapped_types, self._prefix)
+        copy.history = self.history
+        return copy
 
     @classmethod
     def fromkeys(cls, keys, value=None):  # TODO
@@ -121,9 +128,9 @@ class DictWrapper(dict, HistoryMixin):
         super().set_wrapped(key, item, value)
         return item
 
-    #@classmethod
-    #def __new__(cls, *args: Any, **kwargs: Any):
-    #    return cls()
+    # @classmethod
+    # def __new__(cls, *args: Any, **kwargs: Any):
+    #     return cls()
 
     def __str__(self) -> str:
         return self._dict.__str__()
