@@ -1,14 +1,14 @@
 from itertools import chain
 from typing import Optional, Dict, Type, Tuple, Any, Iterator
 
-from .history import HistoryMixin, _History
+from .history import HistoryMixin
 
 
 _RaiseKeyError = object()
 
 
 class DictWrapper(dict, HistoryMixin):
-    __dict__ = None
+    __dict__ = None  # TODO
     _dict: Dict
 
     def clear(self):  # TODO
@@ -80,8 +80,8 @@ class DictWrapper(dict, HistoryMixin):
     def __gt__(self, obj: object) -> bool:
         return self._dict.__gt__(obj)
 
-    def __init__(self, dictionary: Optional[Dict] = None, history: Optional[_History] = None, wrapped_types: Optional[Tuple[Type]] = None, prefix: Any = None):
-        HistoryMixin.__init__(self, history, wrapped_types, prefix)
+    def __init__(self, dictionary: Optional[Dict] = None, parent: Optional[HistoryMixin] = None, wrapped_types: Optional[Tuple[Type]] = None, prefix: Any = None):
+        HistoryMixin.__init__(self, parent, wrapped_types, prefix)
         self._dict = dictionary
 
     def __ior__(self, obj: Dict) -> Dict:  # TODO
@@ -117,8 +117,8 @@ class DictWrapper(dict, HistoryMixin):
         pass
 
     def __setitem__(self, key: Any, value: Any):
-        item = super().__setitem__(key, value)
-        super().set_wrapped(key, item)
+        item = self._dict.__setitem__(key, value)
+        super().set_wrapped(key, item, value)
         return item
 
     #@classmethod

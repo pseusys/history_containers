@@ -8,4 +8,9 @@ leg_database = {
 
 if __name__ == '__main__':
     hict = DictWrapper(leg_database)
-    print(hict)
+    print(f"Wrapped dict: {hict}")
+
+    print("\nLet's count fins as legs!")
+    hict['fish'] = 6
+    print(f"Wrapped dict new value: {hict}")
+    print(f"Wrapped dict history: {hict.history}")
