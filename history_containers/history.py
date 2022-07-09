@@ -23,10 +23,10 @@ class SpecialHistoryEvents(Enum):
 
 
 class HistoryManager:
-    _parent: Optional[Self]
-    _prefix: Any
+    _parent: Optional[Self] = None
+    _prefix: Any = ''
     _type_prefix = ''
-    history: History
+    history: History = []
     _wrapped_types = Iterables
 
     @staticmethod
@@ -48,7 +48,7 @@ class HistoryManager:
             return history_containers._DictWrapper(value, self, self._wrapped_types, key)
         elif isinstance(value, List) and List in self._wrapped_types:
             # noinspection PyProtectedMember
-            return None  # TODO: ListWrapper(...)
+            return value  # TODO: ListWrapper(...)
         else:
             return value
 
@@ -66,5 +66,5 @@ class HistoryManager:
         if self._parent is not None:
             self._parent._set_hist(f'{self._prefix}', self._type_prefix, SpecialHistoryEvents.DELETE)
 
-    def print_history(self) -> str:
+    def print(self) -> str:
         return '\n'.join([f'{path}: {old} -> {new}' for path, old, new in self.history])

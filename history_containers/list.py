@@ -12,6 +12,8 @@ from history_containers import _HistoryManager
 class ListWrapper(list, _HistoryManager):
     __slots__ = ()
 
+    _type_prefix = 'list'
+
     def __init__(self, seq=()):  # TODO
         """
         Built-in mutable sequence.

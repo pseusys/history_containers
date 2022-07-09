@@ -28,8 +28,8 @@ class DictWrapper(dict, _HistoryManager):
         self._dict = {} if dictionary is None else dictionary
 
     def print(self) -> str:
-        raw_history = self.print_history().split('\n')
-        print_history = '\n'.join([f'\t{event}' for event in self.print_history().split('\n')]) if raw_history != [''] else '    [empty]'
+        raw_history = _HistoryManager.print(self).split('\n')
+        print_history = '\n'.join([f'\t{event}' for event in _HistoryManager.print(self).split('\n')]) if raw_history != [''] else '    [empty]'
         return f'value: {self}\nhistory:\n{print_history}'
 
     def clear(self):
@@ -43,7 +43,7 @@ class DictWrapper(dict, _HistoryManager):
 
     @classmethod
     def fromkeys(cls, keys: Iterable[Any], value: Optional[Any] = None) -> Self:
-        return cls(super(DictWrapper).fromkeys(keys, value))
+        return cls(cls.fromkeys(keys, value))
 
     def get(self, key: Any, default: Optional[Any] = None) -> Any:
         return self.__getitem__(key) if self.__contains__(key) else default
@@ -92,7 +92,7 @@ class DictWrapper(dict, _HistoryManager):
     def __delitem__(self, key: Any):
         if self.__contains__(key):
             self._delete_hist(key, self.__getitem__(key))
-        return super(DictWrapper).__delitem__(key)
+        return dict.__delitem__(self, key)
 
     def __eq__(self, obj: object) -> bool:
         return self._dict.__eq__(obj)
@@ -140,8 +140,9 @@ class DictWrapper(dict, _HistoryManager):
         return obj.__ior__(self._dict)
 
     def __setitem__(self, key: Any, value: Any):
-        item = self._dict.__setitem__(key, value)
+        item = self._dict.__getitem__(key) if self.__contains__(key) else None
         self._set_hist(key, item, value)
+        self._dict.__setitem__(key, value)
 
     def __str__(self) -> str:
         return self._dict.__str__()
