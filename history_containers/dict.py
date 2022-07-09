@@ -1,85 +1,104 @@
 from itertools import chain
 from sys import version_info
-from typing import Optional, Dict, Type, Tuple, Any, Iterator
+from typing import Optional, Dict, Type, Tuple, Any, Iterator, Iterable, Mapping, ItemsView, KeysView, ValuesView
+
 if version_info.minor >= 11:
     from typing import Self
 else:
     Self = 'DictWrapper'
 
-from .history import HistoryMixin
+from history_containers import _HistoryManager
 
 
-_RaiseKeyError = object()
+RaiseKeyError = object()
 
 
-class DictWrapper(dict, HistoryMixin):
-    __dict__ = None
+class DictWrapper(dict, _HistoryManager):
+    __slots__ = ()
+
     _dict: Dict
+    _type_prefix = 'dict'
+
+    @staticmethod
+    def _wrap_history_key(key: str) -> str:
+        return f'[{key}]'
+
+    def __init__(self, dictionary: Optional[Dict] = None, parent: Optional[_HistoryManager] = None, wrapped_types: Optional[Tuple[Type]] = None, prefix: Optional[Any] = None):
+        _HistoryManager.__init__(self, parent, wrapped_types, prefix)
+        self._dict = {} if dictionary is None else dictionary
+
+    def print(self) -> str:
+        raw_history = self.print_history().split('\n')
+        print_history = '\n'.join([f'\t{event}' for event in self.print_history().split('\n')]) if raw_history != [''] else '    [empty]'
+        return f'value: {self}\nhistory:\n{print_history}'
 
     def clear(self):
         self._dict.clear()
-        self.clear_history()
+        self._clear_hist()
 
     def copy(self) -> Self:
-        copy = type(self)(self._dict, self._parent, self._wrapped_types, self._prefix)
+        copy = DictWrapper(self._dict, self._parent, self._wrapped_types, self._prefix)
         copy.history = self.history
         return copy
 
     @classmethod
-    def fromkeys(cls, keys, value=None):  # TODO
-        return super(DictWrapper, cls).fromkeys(keys, value)
+    def fromkeys(cls, keys: Iterable[Any], value: Optional[Any] = None) -> Self:
+        return cls(super(DictWrapper).fromkeys(keys, value))
 
-    def get(self, k, default=None):  # TODO
-        return super(DictWrapper, self).get(k, default)
+    def get(self, key: Any, default: Optional[Any] = None) -> Any:
+        return self.__getitem__(key) if self.__contains__(key) else default
 
-    def items(self):
-        return self._dict.items()
+    def items(self) -> ItemsView[Any, Any]:
+        return ItemsView(self)
 
-    def keys(self):
-        return self._dict.keys()
+    def keys(self) -> KeysView[Any]:
+        return KeysView(self)
 
-    def pop(self, k, v=_RaiseKeyError):  # TODO
-        if v is _RaiseKeyError:
-            return super(DictWrapper, self).pop(k)
-        return super(DictWrapper, self).pop(k, v)
+    def values(self) -> ValuesView[Any]:
+        return ValuesView(self)
 
-    def popitem(self, *args, **kwargs):  # TODO
-        """
-        Remove and return a (key, value) pair as a 2-tuple.
+    def pop(self, key: Any, default: Any = RaiseKeyError) -> Any:
+        if self.__contains__(key):
+            result = self._dict.pop(key)
+            self._delete_hist(key, result)  # maybe double writing
+            return result
+        elif default is RaiseKeyError:
+            raise KeyError(key)
+        else:
+            return default
 
-        Pairs are returned in LIFO (last-in, first-out) order.
-        Raises KeyError if the dict is empty.
-        """
-        pass
+    def popitem(self) -> Tuple[Any, Any]:
+        key, value = self._dict.popitem()
+        self._delete_hist(key, value)  # maybe double writing
+        return key, value
 
-    def setdefault(self, k, default=None):  # TODO
-        return super(DictWrapper, self).setdefault(k, default)
+    def setdefault(self, key: Any, default: Any = None) -> Any:
+        if self.__contains__(key):
+            return self.__getitem__(key)
+        else:
+            return self.__setitem__(key, default)
 
-    def update(self, mapping=(), **kwargs):  # TODO
+    def update(self, mapping: Mapping[Any, Any] = (), **kwargs):
         if hasattr(mapping, 'items'):
             mapping = getattr(mapping, 'items')()
-        pairs = ((k, v) for k, v in chain(mapping, getattr(kwargs, 'items')()))
-        super(DictWrapper, self).update(pairs)
-
-    def values(self):  # TODO
-        """ D.values() -> an object providing a view on D's values """
-        pass
-
-    def __class_getitem__(cls, *args, **kwargs):  # TODO
-        """ See PEP 585 """
-        pass
+        pairs = ((key, value) for key, value in chain(mapping, getattr(kwargs, 'items')()))
+        for key, value in pairs:
+            self._set_hist(key, self.get(key, None), value)
+        self._dict.update(pairs)
 
     def __contains__(self, key: Any) -> bool:
         return self._dict.__contains__(key)
 
-    def __delitem__(self, k):  # TODO
-        return super(DictWrapper, self).__delitem__(k)
+    def __delitem__(self, key: Any):
+        if self.__contains__(key):
+            self._delete_hist(key, self.__getitem__(key))
+        return super(DictWrapper).__delitem__(key)
 
     def __eq__(self, obj: object) -> bool:
         return self._dict.__eq__(obj)
 
     def __getitem__(self, key: Any) -> Any:
-        return super().get_wrapped(key, super().__getitem__(key))
+        return self._get_hist(key, self._dict.__getitem__(key))
 
     def __ge__(self, obj: object) -> bool:
         return self._dict.__ge__(obj)
@@ -87,15 +106,13 @@ class DictWrapper(dict, HistoryMixin):
     def __gt__(self, obj: object) -> bool:
         return self._dict.__gt__(obj)
 
-    def __init__(self, dictionary: Optional[Dict] = None, parent: Optional[HistoryMixin] = None, wrapped_types: Optional[Tuple[Type]] = None, prefix: Any = None):
-        HistoryMixin.__init__(self, parent, wrapped_types, prefix)
-        self._dict = dictionary
+    def __ior__(self, obj: Dict) -> Self:
+        self.update(obj)
+        return self
 
-    def __ior__(self, obj: Dict) -> Dict:  # TODO
-        return self._dict.__ior__(obj)
-
-    def __iter__(self) -> Iterator[Any]:
-        return self._dict.__iter__()
+    def __iter__(self) -> Iterator[Tuple[Any, Any]]:
+        for key, item in self.items():
+            yield key, item
 
     def __len__(self) -> int:
         return self._dict.__len__()
@@ -109,28 +126,22 @@ class DictWrapper(dict, HistoryMixin):
     def __ne__(self, obj: object) -> bool:
         return self._dict.__ne__(obj)
 
-    def __or__(self, obj: Dict) -> Dict:  # TODO
-        return self._dict.__or__(obj)
+    def __or__(self, obj: Dict) -> Self:
+        return self.copy().__ior__(obj)
 
     def __repr__(self) -> str:
-        return f'{type(self).__name__}({super(DictWrapper, self).__repr__()})'
+        return self._dict.__repr__()
 
-    def __reversed__(self, *args, **kwargs):  # TODO
-        """ Return a reverse iterator over the dict keys. """
-        pass
+    def __reversed__(self, *args, **kwargs) -> Iterator[Tuple[Any, Any]]:
+        for key, item in self.items().__reversed__():
+            yield key, item
 
-    def __ror__(self, *args, **kwargs):  # TODO
-        """ Return value|self. """
-        pass
+    def __ror__(self, obj: Dict) -> Dict:
+        return obj.__ior__(self._dict)
 
     def __setitem__(self, key: Any, value: Any):
         item = self._dict.__setitem__(key, value)
-        super().set_wrapped(key, item, value)
-        return item
-
-    # @classmethod
-    # def __new__(cls, *args: Any, **kwargs: Any):
-    #     return cls()
+        self._set_hist(key, item, value)
 
     def __str__(self) -> str:
         return self._dict.__str__()
